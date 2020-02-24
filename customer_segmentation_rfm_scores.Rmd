@@ -1,0 +1,14 @@
+---
+title: "Segmentação de Clientes em R usando RFM scores"
+author: "Reinaldo Zezela"
+date: "22/02/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1.0 Introdução
+
+A segmentação de clientes pode ser realizada usando diversas características do cliente. As mais comuns são região geográfica, dados demográficos (por exemplo, idade, sexo, estado civil, renda), psicografia (por exemplo, valores, interesses, estilo de vida, afiliações de grupos) e comportamento de compra (por exemplo, compras anteriores, preferências de envio, visualizações de página em seu site etc.).
