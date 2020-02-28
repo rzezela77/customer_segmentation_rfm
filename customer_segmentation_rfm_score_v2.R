@@ -10,6 +10,8 @@
 library(tidyverse)
 library(pander) # for aesthetics
 
+library(highcharter)
+
 # Load text file into local variable called 'data'
 transaction_dat <-
     read.delim(
@@ -21,7 +23,7 @@ transaction_dat <-
 
 # Display what has been loaded
 
-transaction_dat %>% glimpse()
+# transaction_dat %>% glimpse()
 pander(head(transaction_dat))
 
 head(transaction_dat) %>% pander()
@@ -32,6 +34,7 @@ summary(transaction_dat) %>% pander()
 colnames(transaction_dat) <-
     c('customer_id', 'purchase_amount', 'date_of_purchase')
 
+# convert to date
 transaction_dat$date_of_purchase <-
     as.Date(transaction_dat$date_of_purchase, "%Y-%m-%d")
 
@@ -107,14 +110,15 @@ rfm_data %>% head(10) %>% pander()
 
 # 3.0 Define Customer Segmentation Groups ---------------------------------
 
-rfm_data$segment <- 'NA'
+rfm_data$segment <- NA
 
 rfm_data$segment[which(rfm_data$RFM == 111)] <- 'Lost'
 rfm_data$segment[which(rfm_data$RFM > 111)] <- 'Hibernating'
 
 rfm_data$segment[which(rfm_data$RFM >= 222)] <- 'About to Sleep'
 
-rfm_data$segment[which(rfm_data$RFM >= 333)] <- 'Potential Loyalists'
+rfm_data$segment[which(rfm_data$RFM >= 333)] <-
+    'Potential Loyalists'
 
 rfm_data$segment[which(rfm_data$RFM >= 444)] <- 'Champions'
 
@@ -122,28 +126,152 @@ rfm_data$segment[which(rfm_data$RFM >= 444)] <- 'Champions'
 # 2nd round
 
 rfm_data$segment[which(rfm_data$segment == 'Potential Loyalists' &
-                           rfm_data$M >= 4)] <- 'Loyal Customers'
+                           (rfm_data$F >= 4))] <- 'Loyal Customers'
 
 rfm_data$segment[which(rfm_data$segment == 'About to Sleep' &
-                           rfm_data$M >= 4)] <- 'Need Attention'
+                           (rfm_data$M >= 4))] <-
+    'Need Attention'
 
 rfm_data$segment[which(rfm_data$segment == 'Hibernating' &
-                           rfm_data$M >= 4)] <- 'Can not lose Them'
+                           (rfm_data$F >= 4 & rfm_data$M >= 4))] <-
+    'Can not Lose Them'
 
 rfm_data$segment[which(rfm_data$first_purchase <= 180)] <-
     'New Customers'
 
 
 rfm_data[, -c(1, 6,7,8)] %>% 
-    head(15) %>% pander()
+    head(30) %>% pander()
 
 
 # validate the segments
+
+rfm_data[is.na(rfm_data$segment), ]
+
 rfm_data %>%
     filter(is.na(segment)) %>% 
     head(15)
 
-is.na(rfm_data$segment)
+# is.na(rfm_data$segment)
+# 
+# head(rfm_data[!is.na(rfm_data$segment), ], 15)
 
-head(rfm_data[is.na(rfm_data$segment), ], 15)
+
+
+# 3.1 Distribute Customers by Segment -------------------------------------
+
+rfm_data$segment %>% unique()
+ 
+
+# re-order segments in factor in a wat that makes sense ----
+rfm_data$segment <-
+    factor(
+        x = rfm_data$segment,
+        levels = c(
+            'Lost',
+            'Hibernating',
+            'Can not Lose Them',
+            'About to Sleep',
+            'Need Attention',
+            'New Customers',
+            'Potential Loyalists',
+            'Loyal Customers',
+            'Champions'
+        )
+    )
+
+
+# table of frequency
+
+freqTable <-
+    rfm_data %>%
+    # group_by(group) %>%
+    count(segment) %>%
+    # arrange(desc(n)) %>%
+    rename(Segment = segment, Count = n)
+
+
+
+cust_aggr_dat <-
+    aggregate(x = rfm_data[, 2:5],
+              by = list(rfm_data$segment),
+              mean)
+
+
+cust_aggr_dat %>% pander()
+
+
+
+# 4.0 Plotting ------------------------------------------------------------
+
+hctreemap2(
+    data = freqTable,
+    group_vars = "Segment",
+    size_var = "Count",
+    color_var = "Count"
+)
+
+
+# 4.1 plotting segments
+
+highchart() %>%
+    hc_add_series(
+        data = freqTable,
+        type = 'column',
+        hcaes(x = Segment, y = Count),
+        dataLabels = list(align = "center", enabled = TRUE),
+        name = 'Segments'
+    ) %>%
+    hc_xAxis(categories = unique(freqTable$Segment)) %>%
+    hc_yAxis(title = list(text = "No of customers")
+             # ,stackLabels = list(
+             #     enabled = TRUE,
+             #     style = list(
+             #         fontWeight = "bold",
+             #         color = "#f7a35c",
+             #         textOutline = NULL
+             #     ),
+             #     format = "{total:,.0f}"
+             # )
+    )
+
+
+
+highchart() %>% 
+    hc_add_series(
+        data = cust_aggr_dat,
+        type = 'scatter',
+        hcaes(x = recency, y = monetary, group = Group.1)
+    )
+
+
+highchart() %>% 
+    hc_add_series(
+        data = cust_aggr_dat,
+        type = 'scatter',
+        hcaes(x = recency, y = frequency, group = Group.1)
+    )
+
+
+# 5.0 Customers by Orders -------------------------------------------------
+
+customers_dat %>% head()
+
+cust_orders <- 
+customers_dat %>% 
+    count(frequency) %>% 
+    rename(Frequency = frequency, Count = n)
+
+
+highchart() %>% 
+    hc_add_series(
+        data = cust_orders,
+        type = 'column',
+        hcaes(x = Frequency, y = Count),
+        name = 'customers by orders',
+        dataLabels = list(enabled = TRUE)
+    ) %>% 
+    hc_xAxis(title = list(text = 'Orders')) %>% 
+    hc_yAxis(title = list(text = 'Customers'))
+
 
