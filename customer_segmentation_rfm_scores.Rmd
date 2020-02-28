@@ -217,6 +217,8 @@ Como podem ter constatado essa abordagem gera $125$ segmentos se considerarmos c
 
 De um modo geral, o parâmetro $MONETARY$ é visto como uma métrica agregadora para sumarizar as transações. Assim, dos $125$ segmentos (RFM score) podem ser reduzidos para $25$ segmentos apenas usando os parâmetros $RECENCY$ e $FREQUENCY$. Ademais, se fizermos a combinação destes $25$ podemos alcançar segmentos mais manejáveis e intuitivos, reduzindo deste modo para $6-8$ segmentos.
 
+Está foi a fase mais delicada de todo o processo. Encontrar um critério para definir a segmentação de clientes que faça sentido para o seu negócio. Alguns artigos sugerem a definição dos segmentos com base no bom senso e na natureza do negócio. Então, tentei encontrar um critério que fosse geral, independentemente da natureza do negócio. Com ajuda, da *Tabela 1* defini os segmentos usando o seguinte critério:
+
 ```{r}
 
 # Define Customer Segmentation Groups
@@ -250,6 +252,29 @@ rfm_data$segment[which(rfm_data$first_purchase <= 180)] <-
     'New Customers'
 
 
+rfm_data[, -c(3, 6,7,8)] %>% 
+    head(10) %>% pander()
+```
+
+Visto que, um cliente não pode simultâneamente pertencer a mais de um segmento, ou seja deve pertencer exclusivamente a um único segmento. Então, para validar essa suposição em *código R* podemos usar a seguinte instrução:
+```{r}
+# validate the segments
+
+rfm_data[is.na(rfm_data$segment), ]
+
+# ou
+# rfm_data %>%
+#     filter(is.na(segment))
+```
+O resultado mostra que cada cliente pertence unicamente a um segmento. 
+
+
+![Segmentação](image/RFM_score_Segment.PNG)
+
+### 3.4 Distribuição dos clientes por segmentos
+
+Precisamos de avaliar a distribuição dos clientes por segmentos. E ordena-los de uma forma que faça sentido.
+```{r}
 # re-order segments in factor in a wat that makes sense ----
 rfm_data$segment <-
     factor(
@@ -268,9 +293,94 @@ rfm_data$segment <-
     )
 
 
-rfm_data[, -c(1, 6,7,8)] %>% 
-    head(10) %>% pander()
+# table of frequency
+
+freqTable <-
+    rfm_data %>%
+    # group_by(group) %>%
+    count(segment) %>%
+    # arrange(desc(n)) %>%
+    rename(Segment = segment, Count = n)
+
+freqTable %>% pander()
 ```
+O output mostra a quantidade de clientes distribuidos pelos segmentos definidos.
+
+
+Também podemos mostrar os dados agregados por segmentos.
+```{r}
+cust_aggr_dat <-
+    aggregate(x = rfm_data[, 2:5],
+              by = list(rfm_data$segment),
+              mean)
+
+
+cust_aggr_dat %>% pander()
+```
+Os resultados mostram que os clientes *Champions* $(4395)$, considerados os clientes mais valiosos gastam em média o valor de $430.00$ u.m, efectuaram compras por mais de $6$ vezes e a última compra foi em média há sensivelmente $160$ dias. Enquanto que, os *Lost* o caso pior estão há mais de $08$ anos sem efectuar uma compra. O destaque vai para o segmento *Need Attention*, uma vez que  apresentam um consumo elevado, contudo a última actividade foi há bastante tempo, ou seja há aproximadamnete $4.5$ anos. Daí que, requer um trabalho árduo para recuperá-los.
+
+
+## 4.0 Visualização dos dados
+Para visualizar os dados, vamos apresentar 02 tipos de gráficos: 
+- *treemap* (recomendado); e 
+- gráficos de barras.
+
+### 4.1 Apresentação dos dados usando Treemap
+*Treemap* é o gráfico recomendado para apresentação desse tipo de dados, ou seja dados que incluem variáveis categóricas e númericas.
+
+```{r}
+hctreemap2(
+    data = freqTable,
+    group_vars = "Segment",
+    size_var = "Count",
+    color_var = "Count"
+    )
+
+```
+
+
+### 4.2 Apresentação dos dados usando gráfico de barras
+
+```{r}
+highchart() %>%
+    hc_add_series(
+        data = freqTable,
+        type = 'column',
+        hcaes(x = Segment, y = Count),
+        dataLabels = list(align = "center", enabled = TRUE,
+                          style = list(
+                                      fontWeight = "bold",
+                                      color = "#f7a35c",
+                                      textOutline = NULL
+                                      )
+                          ),
+        name = 'Segments'
+    ) %>%
+    hc_xAxis(categories = unique(freqTable$Segment)) %>%
+    hc_yAxis(title = list(text = "No of customers"))
+
+```
+
+## 5.0 Conclusão
+
+No presente *post* foi avaliado a segmentação dos clientes com base nas suas transacções históricas de compras usando à técnica *RFM score*. Foram usados dados simulados (presumo) mas a ideia é mostrar como esse processo pode ser implementado em um ambiente de produção. 
+
+Os clientes no segmento *Champions* são considerados os mais valiosos e os *About to Sleep* e *Need Attention* precisam de alguma atenção especial para os resgatar.
+
+Na verdade, o critério para a definição dos segmentos com base nos *RFM score* é um pouco ambíguo e requer alguma arte. Alguns autores sugerem que a definição dos segmentos depende da natureza do negócio, por isso desdobrei-me em encontrar um critério que fosse aplicável para todos casos. 
+Tive sucesso aplicando esse método em produção relacionado com recarregamentos efectuado pelos subescritores nos últimos $02$ anos e encorajo sem reservas. Portanto, estou ansioso em ler vossos comentários após a adopção desta técnica.
+
+
+## 6.0 Bibliográfia
+1. https://www.r-bloggers.com/customer-segmentation-using-rfm-analysis/ 
+2. https://www.r-bloggers.com/customer-segmentation-part-1-k-means-clustering/ 
+3. https://www.putler.com/rfm-analysis/ 
+4. https://blog.rsquaredacademy.com/customer-segmentation-using-rfm-analysis/ 
+5. https://earlconf.com/2017/downloads/london/presentations/EARL2017_-_London_-_Alexander_Campbell_-_Customer_segmentation.pdf
+
+
+
+
 
 
 
